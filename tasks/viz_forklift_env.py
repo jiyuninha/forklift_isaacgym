@@ -14,31 +14,33 @@ class ForkliftEnv(VecTask):
         self.cfg = config
         self.env_spacing = 2.0  # 환경 간의 간격을 명시적으로 초기화
         self.envs_per_row = int(np.sqrt(config["env"]["numEnvs"]))  # 환경 배치 계산
+        self.max_episode_length = config["env"].get("max_episode_length", 1000)  # 기본값 1000
         super().__init__(config, rl_device, sim_device, graphics_device_id, headless)
 
     def create_sim(self):
-        """환경과 시뮬레이션 생성"""
+        if hasattr(self, 'sim') and self.sim is not None:
+            print("Sim already exists.")
+            return
+
+        # 기존 초기화 코드
         sim_params = gymapi.SimParams()
         sim_params.up_axis = gymapi.UP_AXIS_Z
-        sim_params.dt = 1 / 60.0  # 시뮬레이션의 시간 스텝 크기 설정
+        sim_params.dt = 1 / 60.0
         sim_params.substeps = 2
 
-        # 그래픽 장치 설정 (헤드리스 모드 비활성화)
         graphics_device_id = 0
         headless = False
 
-        # 시뮬레이션 생성
         self.sim = self.gym.create_sim(0, graphics_device_id, gymapi.SIM_PHYSX, sim_params)
         if self.sim is None:
             print("Error: 시뮬레이션을 생성할 수 없습니다.")
             return
 
-        # 바닥 생성
+        # 바닥 및 에셋 생성
         plane_params = gymapi.PlaneParams()
         plane_params.normal = gymapi.Vec3(0.0, 0.0, 1.0)
         self.gym.add_ground(self.sim, plane_params)
 
-        # 에셋 경로 설정 및 에셋 불러오기
         asset_root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../assets")
         asset_file = "forklift/Pallet_A1/Pallet_A1.urdf"
         asset_options = gymapi.AssetOptions()
@@ -50,6 +52,7 @@ class ForkliftEnv(VecTask):
             return
 
         self.create_envs()
+
 
     def create_envs(self):
         """환경 내에서 에셋 배치"""

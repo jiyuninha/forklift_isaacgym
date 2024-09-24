@@ -13,7 +13,6 @@ class ForkliftEnv(VecTask):
         # config를 self.cfg에 저장
         self.cfg = config
         self.env_spacing = 2.0  # 환경 간의 간격을 명시적으로 초기화
-        self.num_envs = config["env"]["numEnvs"]
         self.envs_per_row = int(np.sqrt(config["env"]["numEnvs"]))  # 환경 배치 계산
         super().__init__(config, rl_device, sim_device, graphics_device_id, headless)
 
@@ -116,6 +115,7 @@ def run_forklift_env():
         env.render()
         actions = torch.zeros((config["env"]["numEnvs"], config["env"]["numActions"]), device="cpu")
         env.step(actions)
+
 
 if __name__ == "__main__":
     run_forklift_env()

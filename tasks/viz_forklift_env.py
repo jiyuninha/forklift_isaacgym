@@ -60,7 +60,7 @@ class ForkliftEnv(VecTask):
         self.handles = []
     
         # 환경의 좌표를 3x3 배열로 배치하기 위한 기준점 계산
-        for i in range(num_envs):
+        for i in range(num_envs):  
             # 3x3 그리드에서 x, y 좌표 계산
             row = i // num_per_row  # 현재 행 번호
             col = i % num_per_row   # 현재 열 번호
@@ -86,7 +86,6 @@ class ForkliftEnv(VecTask):
             # 팔레트 크기 조정 (작게 설정)
             scale = 0.05  # 팔레트 크기를 더 작게 설정
             self.gym.set_actor_scale(env_handle, handle, scale)
-    
             self.handles.append(handle)
 
 

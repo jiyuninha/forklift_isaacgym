@@ -1,5 +1,3 @@
-# test version
-
 from isaacgym import gymutil, gymtorch, gymapi
 from isaacgymenvs.tasks.base.vec_task import VecTask
 
@@ -10,11 +8,11 @@ import torch
 
 class ForkliftEnv(VecTask):
     def __init__(self, config, rl_device, sim_device, graphics_device_id, headless):
-        # config를 self.cfg에 저장
         self.cfg = config
-        self.env_spacing = 2.0  # 환경 간의 간격을 명시적으로 초기화
-        self.envs_per_row = int(np.sqrt(config["env"]["numEnvs"]))  # 환경 배치 계산
+        self.env_spacing = 50.0  # 환경 간의 간격 설정
+        self.num_pallets = 9  # 팔레트의 개수이자 환경의 수 설정
         self.max_episode_length = config["env"].get("max_episode_length", 1000)  # 기본값 1000
+        self.device = rl_device
         super().__init__(config, rl_device, sim_device, graphics_device_id, headless)
 
     def create_sim(self):
@@ -22,7 +20,7 @@ class ForkliftEnv(VecTask):
             print("Sim already exists.")
             return
 
-        # 기존 초기화 코드
+        # 초기화 코드
         sim_params = gymapi.SimParams()
         sim_params.up_axis = gymapi.UP_AXIS_Z
         sim_params.dt = 1 / 60.0
@@ -51,25 +49,53 @@ class ForkliftEnv(VecTask):
             print("Error: 에셋을 불러올 수 없습니다.")
             return
 
-        self.create_envs()
+        # 환경 생성 및 팔레트 배치
+        self._create_envs_with_pallets(self.num_pallets, self.env_spacing)
 
-
-    def create_envs(self):
-        """환경 내에서 에셋 배치"""
-        lower = gymapi.Vec3(-self.env_spacing / 2, -self.env_spacing / 2, 0.0)
-        upper = gymapi.Vec3(self.env_spacing / 2, self.env_spacing / 2, self.env_spacing)
-
+    def _create_envs_with_pallets(self, num_envs, spacing):
+        """각 환경을 3x3 배열로 배치하고, 각 환경의 중심에 팔레트를 놓음"""
+        num_per_row = 3  # 한 줄에 3개의 환경을 배치 (3x3 배열)
+        
         self.envs = []
         self.handles = []
-        for i in range(self.cfg["env"]["numEnvs"]):
-            env = self.gym.create_env(self.sim, lower, upper, self.envs_per_row)
-            self.envs.append(env)
-
-            # 에셋 배치
-            pose = gymapi.Transform()
-            pose.p.z = 2.0  # 높이 설정
-            handle = self.gym.create_actor(env, self.pallet_asset, pose, "pallet", i, 1)
+    
+        # 환경의 좌표를 3x3 배열로 배치하기 위한 기준점 계산
+        for i in range(num_envs):
+            # 3x3 그리드에서 x, y 좌표 계산
+            row = i // num_per_row  # 현재 행 번호
+            col = i % num_per_row   # 현재 열 번호
+    
+            # 환경의 좌표 오프셋 계산
+            env_offset_x = col * spacing  # 열에 따라 x축으로 이동
+            env_offset_y = row * spacing  # 행에 따라 y축으로 이동
+    
+            # 환경 생성 (여기서 오프셋을 사용하여 환경 위치 지정)
+            env_handle = self.gym.create_env(self.sim, gymapi.Vec3(env_offset_x - spacing/2, env_offset_y - spacing/2, 0.0),
+                                             gymapi.Vec3(env_offset_x + spacing/2, env_offset_y + spacing/2, spacing), num_envs)
+            self.envs.append(env_handle)
+    
+            # 팔레트의 위치 설정 (각 환경의 중심에 위치)
+            start_pose = gymapi.Transform()
+            start_pose.p.x = 0.0  # 팔레트는 각 환경의 중심에 위치
+            start_pose.p.y = 0.0
+            start_pose.p.z = 0.5  # 팔레트의 z 위치
+    
+            # 액터 생성 (팔레트)
+            handle = self.gym.create_actor(env_handle, self.pallet_asset, start_pose, "pallet", i, 1)
+    
+            # 팔레트 크기 조정 (작게 설정)
+            scale = 0.05  # 팔레트 크기를 더 작게 설정
+            self.gym.set_actor_scale(env_handle, handle, scale)
+    
             self.handles.append(handle)
+
+
+
+    def set_camera(self):
+        """카메라 위치를 설정하여 더 넓은 환경을 볼 수 있게 함"""
+        cam_pos = gymapi.Vec3(500, 500, 200)  # 카메라를 환경에서 멀리 떨어진 위치로 설정
+        cam_target = gymapi.Vec3(0, 0, 0)  # 카메라가 환경 중심을 바라보도록 설정
+        self.gym.viewer_camera_look_at(self.viewer, None, cam_pos, cam_target)
 
     def pre_physics_step(self, actions):
         """물리 엔진 업데이트 전 동작을 정의"""
@@ -97,7 +123,7 @@ class ForkliftEnv(VecTask):
 def run_forklift_env():
     config = {
         "env": {
-            "numEnvs": 1,
+            "numEnvs": 9,  # 9개의 환경을 설정, 각 환경에 팔레트 하나씩 배치
             "numActions": 4,
             "numObservations": 10
         },
@@ -112,6 +138,9 @@ def run_forklift_env():
 
     env = ForkliftEnv(config, rl_device="cpu", sim_device="cpu", graphics_device_id=0, headless=False)
     env.create_sim()
+
+    # 카메라 위치 설정
+    env.set_camera()
 
     # 렌더링 루프
     while not env.gym.query_viewer_has_closed(env.viewer):

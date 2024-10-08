@@ -66,18 +66,22 @@ class ForkliftEnv(VecTask):
             col = i % num_per_row   # 현재 열 번호
     
             # 환경의 좌표 오프셋 계산
-            env_offset_x = col * spacing  # 열에 따라 x축으로 이동
-            env_offset_y = row * spacing  # 행에 따라 y축으로 이동
+            env_offset_x = col * spacing # 열에 따라 x축으로 이동
+            env_offset_y = row * spacing # 행에 따라 y축으로 이동
     
             # 환경 생성 (여기서 오프셋을 사용하여 환경 위치 지정)
             env_handle = self.gym.create_env(self.sim, gymapi.Vec3(env_offset_x - spacing/2, env_offset_y - spacing/2, 0.0),
-                                             gymapi.Vec3(env_offset_x + spacing/2, env_offset_y + spacing/2, spacing), num_envs)
+                                             gymapi.Vec3(env_offset_x, env_offset_y, spacing), num_envs) 
             self.envs.append(env_handle)
-    
+
+            # Envs List 
+            # print(self.envs[0])
+            
+            
             # 팔레트의 위치 설정 (각 환경의 중심에 위치)
             start_pose = gymapi.Transform()
-            start_pose.p.x = 0.0  # 팔레트는 각 환경의 중심에 위치
-            start_pose.p.y = 0.0
+            start_pose.p.x = env_offset_x - spacing/4  # 팔레트는 각 환경의 중심에 위치
+            start_pose.p.y = env_offset_y - spacing/4
             start_pose.p.z = 0.5  # 팔레트의 z 위치
     
             # 액터 생성 (팔레트)
